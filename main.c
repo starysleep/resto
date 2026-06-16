@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <string.h>
-#include <time.h> // Ditambahkan untuk mendapatkan waktu/tanggal saat ini
+#include <time.h> 
 
 #define MAX_MENU 5
 #define MAX_PESANAN 100
+#define MAX_TRANSAKSI 100
 
+// Struct menu untuk menyimpan data menu restoran
 typedef struct
 {
     int id;
@@ -12,6 +14,7 @@ typedef struct
     int harga;
 } Menu;
 
+// Struct pesanan untuk menyimpan data pesanan pelanggan
 typedef struct
 {
     char nama_menu[30];
@@ -20,11 +23,20 @@ typedef struct
     int subtotal;
 } Pesanan;
 
+// Struct riwayat transaksi untuk menyimpan data transaksi
+typedef struct
+{
+    int id_transaksi;
+    int total_belanja;
+    int diskon;
+    int total_akhir;
+} RiwayatTransaksi;
+
 // Deklarasi Fungsi
 void tampilkanMenu(Menu list[], int n);
 void urutkanMenuTermurah(Menu list[], int n);
 void hitungDiskon(int totalBelanja, int isMember, int *diskon, int *totalAkhir);
-void cetakTanggal(); // Fungsi baru untuk mencetak tanggal
+void cetakTanggal(); 
 
 int main()
 {
@@ -38,6 +50,9 @@ int main()
     int menuSistem;
     int totalPendapatanHarian = 0;
     int jumlahPelangganHarian = 0;
+    
+    // Array untuk menyimpan history Laporan Harian
+    RiwayatTransaksi laporanHarian[MAX_TRANSAKSI];
 
     printf("=== SELAMAT DATANG DI SISTEM RESTORAN DIGITAL ===\n");
 
@@ -56,13 +71,12 @@ int main()
                 ;
 
             printf("[Error] Input tidak valid! Harap masukkan angka.\n");
-            menuSistem = 0; // Reset nilai agar loop tetap berlanjut dengan aman
-            continue;       // Langsung lompat ke putaran loop berikutnya
+            menuSistem = 0; 
+            continue;       
         }
 
         if (menuSistem == 1)
         {
-            // Variabel di-reset untuk setiap pelanggan baru
             Pesanan keranjang[MAX_PESANAN];
             int jumlahJenisPesanan = 0;
             int pilihan, idMenu, qty, i;
@@ -72,9 +86,15 @@ int main()
             int totalAkhir = 0;
             int uangBayar = 0;
 
-            printf("\n--- TRANSAKSI PELANGGAN KE-%d ---\n", jumlahPelangganHarian + 1);
+            printf("\n--- TRANSAKSI (TRX-%04d) ---\n", jumlahPelangganHarian + 1);
             printf("Apakah pelanggan memiliki kartu member? (1 = Ya, 0 = Tidak): ");
-            scanf("%d", &statusMember);
+            if (scanf("%d", &statusMember) != 1 || (statusMember != 0 && statusMember != 1))
+            {
+                while (getchar() != '\n')
+                    ;
+                printf("[Error] Input tidak valid! Anggap sebagai non-member.\n");
+                statusMember = 0;
+            }
 
             // Loop Transaksi Pemesanan
             do
@@ -84,12 +104,13 @@ int main()
                 printf("2. Urutkan Menu (Termurah -> Termahal)\n");
                 printf("3. Tambah Pesanan ke Keranjang\n");
                 printf("4. Selesai & Cetak Struk Pemesanan\n");
-                printf("Pilih opsi (1-4): ");
+                printf("5. Batalkan Transaksi\n");
+                printf("Pilih opsi (1-5): ");
                 if (scanf("%d", &pilihan) != 1)
                 {
                     while (getchar() != '\n')
-                        ; // Bersihkan buffer
-                    printf("[Error] Input harus berupa angka!\n");
+                        ; 
+                    printf("[Error] Input tidak valid! Harap masukkan angka.\n");
                     pilihan = 0;
                     continue;
                 }
@@ -144,8 +165,8 @@ int main()
                 case 4:
                     if (jumlahJenisPesanan == 0)
                     {
-                        printf("\n[Peringatan] Keranjang masih kosong! Batalkan transaksi? (Pilih 1-3 untuk lanjut)\n");
-                        pilihan = 0; // Kembalikan ke loop
+                        printf("\n[Peringatan] Keranjang masih kosong! Batalkan transaksi? (Pilih 5 untuk batal, atau 1-3 untuk lanjut)\n");
+                        pilihan = 0; 
                     }
                     else
                     {
@@ -153,18 +174,29 @@ int main()
                     }
                     break;
 
+                case 5:
+                    printf("\n[Info] Transaksi telah dibatalkan.\n");
+                    break;
+
                 default:
                     printf("Pilihan tidak tersedia!\n");
                 }
-            } while (pilihan != 4);
+            } while (pilihan != 4 && pilihan != 5);
+
+            if (pilihan == 5)
+            {
+                continue;
+            }
 
             // Proses Pembayaran Pelanggan
             hitungDiskon(totalBelanja, statusMember, &diskon, &totalAkhir);
 
+            // --- PENCETAKAN STRUK DENGAN ID TRANSAKSI ---
             printf("\n======================================================\n");
             printf("                 STRUK PEMBAYARAN                     \n");
             printf("======================================================\n");
             cetakTanggal();
+            printf("ID Transaksi    : TRX-%04d\n", jumlahPelangganHarian + 1);
             printf("------------------------------------------------------\n");
             printf("%-3s | %-22s | %-5s | %-10s\n", "No", "Nama Menu", "Qty", "Subtotal");
             printf("------------------------------------------------------\n");
@@ -187,7 +219,14 @@ int main()
             while (1)
             {
                 printf("Masukkan Nominal Pembayaran: Rp");
-                scanf("%d", &uangBayar);
+                if (scanf("%d", &uangBayar) != 1)
+                {
+                    while (getchar() != '\n')
+                        ;
+
+                    printf("[Error] Input tidak valid! Harap masukkan angka.\n");
+                    continue; 
+                }
 
                 if (uangBayar >= totalAkhir)
                 {
@@ -200,6 +239,12 @@ int main()
                     {
                         printf("Pembayaran Sukses!\n");
                     }
+
+                    // Menyimpan data transaksi ke array Riwayat Harian menggunakan id_transaksi
+                    laporanHarian[jumlahPelangganHarian].id_transaksi = jumlahPelangganHarian + 1;
+                    laporanHarian[jumlahPelangganHarian].total_belanja = totalBelanja;
+                    laporanHarian[jumlahPelangganHarian].diskon = diskon;
+                    laporanHarian[jumlahPelangganHarian].total_akhir = totalAkhir;
 
                     // Tambahkan ke rekap harian setelah sukses dibayar
                     totalPendapatanHarian += totalAkhir;
@@ -218,12 +263,30 @@ int main()
         }
         else if (menuSistem == 2)
         {
-            // Laporan Harian
+            // --- LAPORAN HARIAN DENGAN FORMAT ID TRANSAKSI ---
             printf("\n======================================================\n");
             printf("               LAPORAN TRANSAKSI HARIAN               \n");
             printf("======================================================\n");
             cetakTanggal();
-            printf("Total Pelanggan           : %d orang\n", jumlahPelangganHarian);
+            
+            if (jumlahPelangganHarian == 0) {
+                printf("\nBelum ada transaksi yang terjadi hari ini.\n\n");
+            } else {
+                printf("------------------------------------------------------\n");
+                printf("%-12s | %-13s | %-9s | %-11s\n", "ID Transaksi", "Total Belanja", "Diskon", "Total Bayar");
+                printf("------------------------------------------------------\n");
+                for (int i = 0; i < jumlahPelangganHarian; i++)
+                {
+                    printf("TRX-%04d     | Rp%-11d | Rp%-7d | Rp%-9d\n",
+                           laporanHarian[i].id_transaksi,
+                           laporanHarian[i].total_belanja,
+                           laporanHarian[i].diskon,
+                           laporanHarian[i].total_akhir);
+                }
+                printf("------------------------------------------------------\n");
+            }
+            
+            printf("Total Transaksi           : %d Transaksi\n", jumlahPelangganHarian);
             printf("Total Pendapatan Hari Ini : Rp%d\n", totalPendapatanHarian);
             printf("======================================================\n");
             printf("Sistem Kasir Ditutup. Selamat beristirahat!\n");
